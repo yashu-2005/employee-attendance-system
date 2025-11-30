@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Profile</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .container { max-width: 500px; margin: auto; padding: 20px; }
+        input { width: 100%; padding: 8px; margin: 5px 0 15px 0; box-sizing: border-box; }
+        button { padding: 10px 15px; margin-top: 10px; cursor: pointer; }
+        h3 { margin-top: 30px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>My Profile</h2>
+
+    <form id="profileForm">
+        <label>Name:</label>
+        <input type="text" id="name" required>
+
+        <label>Email:</label>
+        <input type="email" id="email" required readonly>
+
+        <label>Role:</label>
+        <input type="text" id="role" readonly>
+
+        <label>Employee ID:</label>
+        <input type="text" id="employeeId" readonly>
+
+        <label>Department:</label>
+        <input type="text" id="department">
+
+        <label>Created At:</label>
+        <input type="text" id="createdAt" readonly>
+
+        <button type="submit">Save Changes</button>
+    </form>
+
+    <h3>Change Password</h3>
+    <form id="passwordForm">
+        <label>Current Password:</label>
+        <input type="password" id="currentPassword" required>
+
+        <label>New Password:</label>
+        <input type="password" id="newPassword" required>
+
+        <label>Confirm New Password:</label>
+        <input type="password" id="confirmPassword" required>
+
+        <button type="submit">Update Password</button>
+    </form>
+
+    <button onclick="logout()">Logout</button>
+</div>
+
+<script>
+    // Get user info from localStorage
+    let users = JSON.parse(localStorage.getItem("users")) || [];
+    const userId = localStorage.getItem("userId");
+
+    if (!userId) {
+        alert("Not logged in");
+        window.location.href = "index.html";
+    }
+
+    let user = users.find(u => u.id === userId);
+
+    // Fill profile form fields
+    if (user) {
+        document.getElementById("name").value = user.name || "";
+        document.getElementById("email").value = user.email || "";
+        document.getElementById("role").value = user.role || "";
+        document.getElementById("employeeId").value = user.employeeId || "";
+        document.getElementById("department").value = user.department || "";
+        document.getElementById("createdAt").value = user.createdAt || "";
+    } else {
+        alert("User not found");
+    }
+
+    // Save profile changes
+    document.getElementById("profileForm").addEventListener("submit", function(e){
+        e.preventDefault();
+        
+        user.name = document.getElementById("name").value;
+        user.department = document.getElementById("department").value;
+
+        // Update localStorage
+        localStorage.setItem("users", JSON.stringify(users));
+        localStorage.setItem("userName", user.name); // update dashboard welcome
+
+        alert("Profile updated successfully!");
+    });
+
+    // Change password
+    document.getElementById("passwordForm").addEventListener("submit", function(e){
+        e.preventDefault();
+
+        const current = document.getElementById("currentPassword").value;
+        const newPass = document.getElementById("newPassword").value;
+        const confirm = document.getElementById("confirmPassword").value;
+
+        if(current !== user.password) {
+            alert("Current password is incorrect!");
+            return;
+        }
+
+        if(newPass !== confirm) {
+            alert("New password and confirm password do not match!");
+            return;
+        }
+
+        user.password = newPass;
+        localStorage.setItem("users", JSON.stringify(users));
+        alert("Password updated successfully!");
+
+        // Clear password fields
+        document.getElementById("currentPassword").value = "";
+        document.getElementById("newPassword").value = "";
+        document.getElementById("confirmPassword").value = "";
+    });
+
+    // Logout function
+    function logout() {
+        localStorage.removeItem("token");
+        localStorage.removeItem("userId");
+        localStorage.removeItem("userName");
+        window.location.href = "index.html";
+    }
+</script>
+</body>
+</html>

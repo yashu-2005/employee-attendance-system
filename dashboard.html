@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            margin-top: 20px;
+        }
+        .day {
+            border: 1px solid #ccc;
+            padding: 10px;
+            text-align: center;
+            border-radius: 5px;
+        }
+        .present { background-color: #4CAF50; color: white; }
+        .late { background-color: #FFEB3B; color: black; }
+        .absent { background-color: #F44336; color: white; }
+        .half { background-color: #FF9800; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Welcome to Dashboard</h2>
+    <p id="welcome"></p>
+
+    <h3>Monthly Attendance Summary:</h3>
+    <ul id="attendanceStats">
+        <li id="presentCount">Present: 0</li>
+        <li id="lateCount">Late: 0</li>
+        <li id="absentCount">Absent: 0</li>
+    </ul>
+
+    <h3>Attendance Calendar:</h3>
+    <div class="calendar" id="calendar"></div>
+
+    <a href="attendance.html">
+        <button>Mark Attendance</button>
+    </a>
+    <button onclick="logout()">Logout</button>
+</div>
+
+<script>
+    const userId = localStorage.getItem("userId");
+    const userName = localStorage.getItem("userName");
+    const welcomeEl = document.getElementById("welcome");
+    const presentCountEl = document.getElementById("presentCount");
+    const lateCountEl = document.getElementById("lateCount");
+    const absentCountEl = document.getElementById("absentCount");
+    const calendarEl = document.getElementById("calendar");
+
+    welcomeEl.textContent = `Hello, ${userName || "User"}!`;
+
+    function renderDashboard() {
+        const attendanceData = JSON.parse(localStorage.getItem("attendance")) || {};
+        const userAttendance = attendanceData[userId] || [];
+
+        // Get current month/year
+        const now = new Date();
+        const month = now.getMonth();
+        const year = now.getFullYear();
+
+        let present = 0, late = 0, absent = 0;
+
+        // Prepare calendar
+        calendarEl.innerHTML = "";
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const dayDiv = document.createElement("div");
+            dayDiv.classList.add("day");
+            dayDiv.textContent = day;
+
+            // Find record for this day
+            const record = userAttendance.find(a => a.date === dateStr);
+
+            if (record) {
+                if (record.status === "Present") {
+                    dayDiv.classList.add("present");
+                    present++;
+                } else if (record.status === "Late") {
+                    dayDiv.classList.add("late");
+                    late++;
+                } else if (record.status === "Absent") {
+                    dayDiv.classList.add("absent");
+                    absent++;
+                } else if (record.status === "Half-Day") {
+                    dayDiv.classList.add("half");
+                }
+            } else {
+                // Unmarked days → absent (optional)
+                dayDiv.classList.add("absent");
+                absent++;
+            }
+
+            calendarEl.appendChild(dayDiv);
+        }
+
+        presentCountEl.textContent = `Present: ${present}`;
+        lateCountEl.textContent = `Late: ${late}`;
+        absentCountEl.textContent = `Absent: ${absent}`;
+    }
+
+    renderDashboard();
+
+    window.addEventListener("storage", (event) => {
+        if (event.key === "attendance") renderDashboard();
+    });
+
+    function logout() {
+        localStorage.removeItem("token");
+        localStorage.removeItem("userId");
+        localStorage.removeItem("userName");
+        window.location.href = "login.html";
+    }
+</script>
+</body>
+</html>

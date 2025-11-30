@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Employee Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 10px; }
+        h2, h3 { margin-top: 20px; }
+        button { margin-top: 10px; padding: 5px 10px; cursor: pointer; }
+
+        /* Table Styles */
+        .table-container { overflow-x: auto; margin-top: 20px; }
+        table { border-collapse: collapse; width: 100%; min-width: 600px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: center; white-space: nowrap; }
+        th { background-color: #f2f2f2; }
+
+        /* Calendar Styles */
+        .calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 10px; }
+        .day { border: 1px solid #ccc; padding: 5px; text-align: center; border-radius: 5px; font-size: 12px; }
+        .present { background-color: #4CAF50; color: white; }
+        .late { background-color: #FFEB3B; color: black; }
+        .absent { background-color: #F44336; color: white; }
+        .half { background-color: #FF9800; color: white; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2 id="welcome"></h2>
+
+    <!-- Quick Check-In / Check-Out -->
+    <button id="checkBtn">Check In</button>
+
+    <!-- Attendance Table -->
+    <h3>My Attendance This Month:</h3>
+    <div class="table-container">
+        <table id="attendanceTable">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Check In</th>
+                    <th>Check Out</th>
+                    <th>Total Hours</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <!-- Calendar View -->
+    <h3>Attendance Calendar:</h3>
+    <div id="calendar" class="calendar"></div>
+
+    <button onclick="logout()">Logout</button>
+</div>
+
+<script>
+    const userId = localStorage.getItem("userId") || "u1";
+    const userName = localStorage.getItem("userName") || "Employee";
+    const welcomeEl = document.getElementById("welcome");
+    const attendanceTableBody = document.querySelector("#attendanceTable tbody");
+    const calendarEl = document.getElementById("calendar");
+    const checkBtn = document.getElementById("checkBtn");
+
+    welcomeEl.textContent = `Welcome, ${userName}!`;
+
+    // Load attendance data from localStorage
+    const attendanceData = JSON.parse(localStorage.getItem("attendance")) || {};
+    if (!attendanceData[userId]) attendanceData[userId] = [];
+
+    // Utility: calculate total hours
+    function getHours(checkIn, checkOut) {
+        if (!checkIn || !checkOut) return 0;
+        const start = new Date(`1970-01-01T${checkIn}:00`);
+        const end = new Date(`1970-01-01T${checkOut}:00`);
+        return ((end - start)/3600000).toFixed(2);
+    }
+
+    // Render Attendance Table
+    function renderTable() {
+        attendanceTableBody.innerHTML = "";
+        const records = attendanceData[userId];
+        if (records.length === 0) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<td colspan="5">No attendance recorded yet.</td>`;
+            attendanceTableBody.appendChild(tr);
+            return;
+        }
+
+        records.forEach(r => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td>${r.date}</td>
+                <td>${r.checkInTime || '-'}</td>
+                <td>${r.checkOutTime || '-'}</td>
+                <td>${getHours(r.checkInTime, r.checkOutTime)}</td>
+                <td>${r.status}</td>
+            `;
+            attendanceTableBody.appendChild(tr);
+        });
+    }
+
+    renderTable();
+
+    // Render Calendar
+    function renderCalendar() {
+        calendarEl.innerHTML = "";
+        const now = new Date();
+        const month = now.getMonth();
+        const year = now.getFullYear();
+        const daysInMonth = new Date(year, month+1, 0).getDate();
+        const records = attendanceData[userId];
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+            const div = document.createElement("div");
+            div.classList.add("day");
+            const rec = records.find(r => r.date === dateStr);
+            if (rec) div.classList.add(rec.status.toLowerCase().replace(' ',''));
+            else div.classList.add("absent");
+            div.textContent = day;
+            calendarEl.appendChild(div);
+        }
+    }
+
+    renderCalendar();
+
+    // Check In / Check Out
+    checkBtn.addEventListener("click", () => {
+        const now = new Date();
+        const dateStr = now.toISOString().split("T")[0];
+        let records = attendanceData[userId];
+        let todayRecord = records.find(r => r.date === dateStr);
+
+        if (!todayRecord) {
+            // Check In
+            todayRecord = { date: dateStr, checkInTime: now.toTimeString().split(" ")[0], checkOutTime: null, status: "Present" };
+            records.push(todayRecord);
+            checkBtn.textContent = "Check Out";
+        } else if (!todayRecord.checkOutTime) {
+            // Check Out
+            todayRecord.checkOutTime = now.toTimeString().split(" ")[0];
+            todayRecord.totalHours = getHours(todayRecord.checkInTime, todayRecord.checkOutTime);
+            checkBtn.disabled = true; // checked out for today
+        }
+
+        localStorage.setItem("attendance", JSON.stringify(attendanceData));
+        renderTable();
+        renderCalendar();
+    });
+
+    // Set initial button state
+    const todayRecord = attendanceData[userId].find(r => r.date === new Date().toISOString().split("T")[0]);
+    if (todayRecord) {
+        checkBtn.textContent = todayRecord.checkOutTime ? "Checked Out" : "Check Out";
+        if (todayRecord.checkOutTime) checkBtn.disabled = true;
+    }
+
+    // Logout
+    function logout() {
+        localStorage.removeItem("token");
+        localStorage.removeItem("userId");
+        localStorage.removeItem("userName");
+        window.location.href = "login.html";
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mark Attendance</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h2>Attendance Page</h2>
+        <p id="welcome"></p>
+
+        <button id="checkInBtn">Check In</button>
+        <button id="checkOutBtn">Check Out</button>
+        <p id="status"></p>
+
+        <a href="dashboard.html"><button>Back to Dashboard</button></a>
+        <button onclick="logout()">Logout</button>
+    </div>
+
+    <script>
+        const userId = localStorage.getItem("userId");
+        const userName = localStorage.getItem("userName");
+        const welcomeEl = document.getElementById("welcome");
+        const statusEl = document.getElementById("status");
+        const checkInBtn = document.getElementById("checkInBtn");
+        const checkOutBtn = document.getElementById("checkOutBtn");
+
+        welcomeEl.textContent = `Hello, ${userName || "User"}!`;
+
+        // Load attendance data
+        let attendanceData = JSON.parse(localStorage.getItem("attendance")) || {};
+        if (!attendanceData[userId]) attendanceData[userId] = [];
+
+        // Helper function to get today string
+        const today = new Date().toISOString().split("T")[0];
+
+        // Check if already checked in today
+        let todayRecord = attendanceData[userId].find(a => a.date === today);
+
+        if (todayRecord) {
+            if (todayRecord.checkInTime && !todayRecord.checkOutTime) {
+                statusEl.textContent = `Checked in at ${todayRecord.checkInTime}. Please check out.`;
+            } else if (todayRecord.checkInTime && todayRecord.checkOutTime) {
+                statusEl.textContent = `You already checked out today. Total hours: ${todayRecord.totalHours}`;
+            }
+        }
+
+        // Check In
+        checkInBtn.addEventListener("click", () => {
+            if (todayRecord && todayRecord.checkInTime) {
+                statusEl.textContent = `Already checked in today at ${todayRecord.checkInTime}`;
+                return;
+            }
+
+            const now = new Date();
+            const time = now.toTimeString().split(" ")[0]; // HH:MM:SS
+
+            todayRecord = { date: today, checkInTime: time, checkOutTime: null, totalHours: 0, status: "Present" };
+            attendanceData[userId].push(todayRecord);
+            localStorage.setItem("attendance", JSON.stringify(attendanceData));
+
+            statusEl.textContent = `Checked in at ${time}`;
+        });
+
+        // Check Out
+        checkOutBtn.addEventListener("click", () => {
+            if (!todayRecord || !todayRecord.checkInTime) {
+                statusEl.textContent = "You need to check in first!";
+                return;
+            }
+            if (todayRecord.checkOutTime) {
+                statusEl.textContent = `Already checked out at ${todayRecord.checkOutTime}`;
+                return;
+            }
+
+            const now = new Date();
+            const time = now.toTimeString().split(" ")[0];
+            todayRecord.checkOutTime = time;
+
+            // Calculate total hours
+            const checkInDate = new Date(today + "T" + todayRecord.checkInTime);
+            const checkOutDate = new Date(today + "T" + time);
+            const diff = (checkOutDate - checkInDate) / 1000 / 60 / 60; // hours
+            todayRecord.totalHours = diff.toFixed(2);
+
+            // Determine status: late if checked in after 9:30 AM
+            const lateThreshold = new Date(today + "T09:30:00");
+            todayRecord.status = new Date(today + "T" + todayRecord.checkInTime) > lateThreshold ? "Late" : "Present";
+
+            localStorage.setItem("attendance", JSON.stringify(attendanceData));
+
+            statusEl.textContent = `Checked out at ${time}. Total hours: ${todayRecord.totalHours}. Status: ${todayRecord.status}`;
+        });
+
+        function logout() {
+            localStorage.removeItem("token");
+            localStorage.removeItem("userId");
+            localStorage.removeItem("userName");
+            window.location.href = "login.html";
+        }
+    </script>
+</body>
+</html>

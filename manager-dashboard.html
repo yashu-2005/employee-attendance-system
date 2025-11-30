@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Manager Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 10px; }
+        h2, h3 { margin-top: 20px; }
+        .filter-container { margin-top: 20px; }
+        button { margin-top: 10px; padding: 5px 10px; cursor: pointer; }
+
+        /* Table Styles */
+        .table-container { overflow-x: auto; margin-top: 20px; }
+        table { border-collapse: collapse; width: 100%; min-width: 700px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: center; white-space: nowrap; }
+        th { background-color: #f2f2f2; }
+
+        /* Calendar Styles */
+        .calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 10px; }
+        .day { border: 1px solid #ccc; padding: 5px; text-align: center; border-radius: 5px; font-size: 12px; }
+        .present { background-color: #4CAF50; color: white; }
+        .late { background-color: #FFEB3B; color: black; }
+        .absent { background-color: #F44336; color: white; }
+        .half { background-color: #FF9800; color: white; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>Welcome, Manager</h2>
+
+    <!-- Filters -->
+    <div class="filter-container">
+        <label for="employeeFilter">Employee:</label>
+        <input type="text" id="employeeFilter" placeholder="Name or Employee ID">
+        <label for="statusFilter">Status:</label>
+        <select id="statusFilter">
+            <option value="">All</option>
+            <option value="Present">Present</option>
+            <option value="Late">Late</option>
+            <option value="Absent">Absent</option>
+            <option value="Half-Day">Half-Day</option>
+        </select>
+        <button id="applyFilter">Apply Filter</button>
+    </div>
+
+    <!-- Attendance Table -->
+    <h3>Team Attendance Today:</h3>
+    <div class="table-container">
+        <table id="attendanceTable">
+            <thead>
+                <tr>
+                    <th>Employee ID</th>
+                    <th>Name</th>
+                    <th>Date</th>
+                    <th>Check In</th>
+                    <th>Check Out</th>
+                    <th>Total Hours</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <!-- Team Calendar -->
+    <h3>Team Calendar (Current Month)</h3>
+    <div id="teamCalendar" class="calendar"></div>
+
+    <!-- Weekly Chart -->
+    <h3>Weekly Attendance Trend</h3>
+    <canvas id="weeklyChart" width="400" height="150"></canvas>
+
+    <!-- CSV Export -->
+    <button id="exportCSV">Export CSV</button>
+    <button onclick="logout()">Logout</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Mock Users and Attendance (Replace with API in production)
+    const usersData = JSON.parse(localStorage.getItem("users")) || [
+        { id: "u1", name: "Alice", employeeId: "EMP001" },
+        { id: "u2", name: "Bob", employeeId: "EMP002" },
+        { id: "u3", name: "Charlie", employeeId: "EMP003" }
+    ];
+    const attendanceData = JSON.parse(localStorage.getItem("attendance")) || {};
+    const today = new Date().toISOString().split("T")[0];
+
+    const attendanceTableBody = document.querySelector("#attendanceTable tbody");
+    const employeeFilter = document.getElementById("employeeFilter");
+    const statusFilter = document.getElementById("statusFilter");
+    const applyFilterBtn = document.getElementById("applyFilter");
+    const teamCalendarEl = document.getElementById("teamCalendar");
+
+    // Render Attendance Table
+    function renderTable(filterName = "", filterStatus = "") {
+        attendanceTableBody.innerHTML = "";
+        usersData.forEach(user => {
+            const records = attendanceData[user.id] || [];
+            const todayRecord = records.find(r => r.date === today);
+            const status = todayRecord ? todayRecord.status : "Absent";
+            const checkIn = todayRecord ? todayRecord.checkInTime : "-";
+            const checkOut = todayRecord ? todayRecord.checkOutTime : "-";
+            const totalHours = todayRecord ? todayRecord.totalHours : "-";
+
+            if ((filterName && !user.name.toLowerCase().includes(filterName.toLowerCase()) &&
+                 !user.employeeId.toLowerCase().includes(filterName.toLowerCase())) ||
+                (filterStatus && status !== filterStatus)) return;
+
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td>${user.employeeId}</td>
+                <td>${user.name}</td>
+                <td>${today}</td>
+                <td>${checkIn}</td>
+                <td>${checkOut}</td>
+                <td>${totalHours}</td>
+                <td>${status}</td>
+            `;
+            attendanceTableBody.appendChild(row);
+        });
+    }
+    applyFilterBtn.addEventListener("click", () => renderTable(employeeFilter.value, statusFilter.value));
+    renderTable();
+
+    // Render Team Calendar
+    function renderTeamCalendar() {
+        teamCalendarEl.innerHTML = "";
+        const now = new Date();
+        const month = now.getMonth();
+        const year = now.getFullYear();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+            const dayDiv = document.createElement("div");
+            dayDiv.classList.add("day");
+            let statusSummary = "";
+            usersData.forEach(user => {
+                const records = attendanceData[user.id] || [];
+                const rec = records.find(r => r.date === dateStr);
+                statusSummary += rec ? rec.status[0] : "A";
+            });
+            if (statusSummary.includes("L")) dayDiv.classList.add("late");
+            else if (statusSummary.includes("P")) dayDiv.classList.add("present");
+            else dayDiv.classList.add("absent");
+            dayDiv.textContent = day;
+            teamCalendarEl.appendChild(dayDiv);
+        }
+    }
+    renderTeamCalendar();
+
+    // Weekly Attendance Chart
+    const ctx = document.getElementById('weeklyChart').getContext('2d');
+    const weeklyData = { present: [0,0,0,0], late: [0,0,0,0], absent: [0,0,0,0] };
+    usersData.forEach(user => {
+        const records = attendanceData[user.id] || [];
+        records.forEach(r => {
+            const day = new Date(r.date).getDate();
+            const week = Math.floor((day-1)/7);
+            if (r.status === "Present") weeklyData.present[week]++;
+            else if (r.status === "Late") weeklyData.late[week]++;
+            else weeklyData.absent[week]++;
+        });
+    });
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Week 1','Week 2','Week 3','Week 4'],
+            datasets: [
+                { label: 'Present', data: weeklyData.present, backgroundColor: 'green' },
+                { label: 'Late', data: weeklyData.late, backgroundColor: 'yellow' },
+                { label: 'Absent', data: weeklyData.absent, backgroundColor: 'red' }
+            ]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'top' } } }
+    });
+
+    // CSV Export
+    document.getElementById("exportCSV").addEventListener("click", () => {
+        let csv = "EmployeeID,Name,Date,CheckIn,CheckOut,TotalHours,Status\n";
+        usersData.forEach(user => {
+            const records = attendanceData[user.id] || [];
+            records.forEach(r => {
+                csv += `${user.employeeId},${user.name},${r.date},${r.checkInTime || '-'},${r.checkOutTime || '-'},${r.totalHours || 0},${r.status || 'Absent'}\n`;
+            });
+        });
+        const blob = new Blob([csv], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `attendance_report_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    // Logout
+    function logout() {
+        localStorage.removeItem("token");
+        localStorage.removeItem("userId");
+        localStorage.removeItem("userName");
+        window.location.href = "login.html";
+    }
+</script>
+</body>
+</html>
